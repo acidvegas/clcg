@@ -1,0 +1,16 @@
+clcg
+clcg-static
+*.o
+*.a
+*.so
+*.so.*
+tests/libtest
+bench/bench
+bench/gen128
+tests/fullcheck
+examples/basic
+examples/batch
+examples/resume
+examples/threads
+examples/ping
+*.state

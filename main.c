@@ -24,6 +24,8 @@ typedef clcg_u128 u128;
 
 #define STATE_MARKER "clcg"
 
+#define VERSION "1.0.0"
+
 static volatile sig_atomic_t stop_flag;
 
 static char   out_buf[OUT_BUF];
@@ -286,7 +288,8 @@ static void usage(void) {
 	      "  -p, --ports LIST     Pair every IP with these ports, e.g. 22,80,1024-3000,U:53,S:38412\n"
 	      "                       (0-65535, T: U: S: for TCP, UDP, SCTP, TCP when untagged)\n"
 	      "  --rounds N           Feistel rounds that shuffle the pairs (default: 4, max: 64)\n"
-	      "  -h, --help           Show this help\n", stderr);
+	      "  -h, --help           Show this help\n"
+	      "  --version            Show the version\n", stderr);
 }
 
 int main(int argc, char **argv) {
@@ -303,6 +306,7 @@ int main(int argc, char **argv) {
 		{ "ports",          required_argument, 0, 'p' },
 		{ "rounds",         required_argument, 0, 10 },
 		{ "help",           no_argument,       0, 'h' },
+		{ "version",        no_argument,       0, 11 },
 		{ 0, 0, 0, 0 },
 	};
 
@@ -327,6 +331,7 @@ int main(int argc, char **argv) {
 			case 'p': ports = optarg; break;
 			case 10: if (!parse_u64(optarg, &rounds) || !rounds || rounds > CLCG_ROUNDS_MAX) die(2, "--rounds must be from 1 to %d", CLCG_ROUNDS_MAX); break;
 			case 'h': usage(); return 0;
+			case 11: puts("clcg " VERSION); return 0;
 			default: usage(); return 2;
 		}
 	}

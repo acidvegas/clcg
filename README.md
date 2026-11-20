@@ -1,6 +1,6 @@
 # clcg
 
-Stream every IP address in a list of CIDRs exactly once, in a pseudo-random order, with sharding, exclusions and resume. Use it as a command that writes IPs to stdout, or as a C library that hands them to your program directly. It is the C successor to [pylcg](https://github.com/acidvegas/pylcg) and runs 70 to 90 times faster. With `--ports` it streams every IP:port pair instead, TCP, UDP or SCTP, shuffled by a Feistel network.
+Stream every IP address in a list of CIDRs exactly once, in a pseudo-random order, with sharding, exclusions and resume. Use it as a command that writes IPs to stdout, or as a C library that hands them to your program directly. With `--ports` it streams every IP:port pair instead, TCP, UDP or SCTP, shuffled by a Feistel network.
 
 ## Building
 
@@ -218,7 +218,7 @@ Measured on a Ryzen 5 PRO 2400GE, one core, `-O2`:
 | Library `clcg_next`, raw bytes   | ~26           |
 | Library `clcg_next_batch`, 1024  | ~11           |
 
-That is roughly 150M IPs per second to `/dev/null` at full clock. Through a pipe the pipe itself is the limit, about 125M IPs per second on this machine. pylcg does about 1.7M per second.
+That is roughly 150M IPs per second to `/dev/null` at full clock. Through a pipe the pipe itself is the limit, about 125M IPs per second on this machine.
 
 With `--ports`, 1.0.0.0/8 on 16 ports to `/dev/null`:
 

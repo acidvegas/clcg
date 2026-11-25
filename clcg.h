@@ -13,8 +13,17 @@
 extern "C" {
 #endif
 
-/* Steps and counts reach 2^127 for IPv6, so they need 128 bits */
+/* Steps and counts reach 2^127 for IPv6, so they need 128 bits. Targets without __int128
+ * (32-bit CPUs) or built with -DCLCG_NO_IPV6 are IPv4 only, where 64 bits always fit. */
+#if !defined(CLCG_NO_IPV6) && !defined(__SIZEOF_INT128__)
+#define CLCG_NO_IPV6
+#endif
+
+#ifdef CLCG_NO_IPV6
+typedef uint64_t clcg_u128;
+#else
 typedef unsigned __int128 clcg_u128;
+#endif
 
 typedef struct clcg clcg;
 

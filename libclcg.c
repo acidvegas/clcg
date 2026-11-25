@@ -3,7 +3,9 @@
  * libclcg.c
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -12,9 +14,15 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/random.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 
 #include "clcg.h"
+
+/* newlib (ESP-IDF and other embedded targets) only has getline as __getline */
+#if defined(__NEWLIB__) && !defined(getline)
+#define getline __getline
+#endif
 
 typedef clcg_u128 u128;
 
@@ -166,9 +174,11 @@ static int parse_cidr(const char *text, int strict, int *family, struct range *o
 	if (inet_pton(AF_INET, buf, raw) == 1) {
 		*family = 4;
 		bits    = 32;
+#ifndef CLCG_NO_IPV6
 	} else if (inet_pton(AF_INET6, buf, raw) == 1) {
 		*family = 6;
 		bits    = 128;
+#endif
 	} else {
 		return 0;
 	}
@@ -420,11 +430,15 @@ static int parse_port(const char *s, unsigned *out) {
  * ports are kept sorted by protocol then number, so the order they were given in does not
  * change the output. Returns 0 or an errno with err filled. */
 static int parse_ports(clcg *g, const char *arg, char *err, size_t errlen) {
-	uint64_t seen[3 * 65536 / 64] = { 0 };
+	/* 24KB, on the heap so small embedded stacks can hold the caller */
+	uint64_t *seen = calloc(3 * 65536 / 64, sizeof(*seen));
 	char *copy = strdup(arg), *save = NULL;
 
-	if (!copy)
+	if (!copy || !seen) {
+		free(copy);
+		free(seen);
 		return snprintf(err, errlen, "out of memory"), ENOMEM;
+	}
 
 	for (char *tok = strtok_r(copy, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
 		char *num, *dash;
@@ -443,6 +457,7 @@ static int parse_ports(clcg *g, const char *arg, char *err, size_t errlen) {
 			if (!t) {
 				snprintf(err, errlen, "Invalid port protocol (use T:, U: or S:): %s", tok);
 				free(copy);
+				free(seen);
 				return EINVAL;
 			}
 
@@ -459,6 +474,7 @@ static int parse_ports(clcg *g, const char *arg, char *err, size_t errlen) {
 
 			snprintf(err, errlen, "Invalid port or port range: %s", tok);
 			free(copy);
+			free(seen);
 			return EINVAL;
 		}
 
@@ -472,14 +488,14 @@ static int parse_ports(clcg *g, const char *arg, char *err, size_t errlen) {
 		g->nports += (size_t)__builtin_popcountll(seen[i]);
 
 	if (!g->nports)
-		return snprintf(err, errlen, "No ports given"), EINVAL;
+		return free(seen), snprintf(err, errlen, "No ports given"), EINVAL;
 
 	g->ports  = malloc(g->nports * sizeof(*g->ports));
 	g->protos = malloc(g->nports * sizeof(*g->protos));
 	g->ptxt   = malloc(g->nports * sizeof(*g->ptxt));
 
 	if (!g->ports || !g->protos || !g->ptxt)
-		return snprintf(err, errlen, "out of memory"), ENOMEM;
+		return free(seen), snprintf(err, errlen, "out of memory"), ENOMEM;
 
 	for (unsigned code = 0, n = 0; code < 3 * 65536; code++) {
 		if (seen[code / 64] >> (code % 64) & 1) {
@@ -492,6 +508,7 @@ static int parse_ports(clcg *g, const char *arg, char *err, size_t errlen) {
 		}
 	}
 
+	free(seen);
 	return 0;
 }
 
@@ -857,10 +874,12 @@ clcg *clcg_new_ports(const struct clcg_config *cfg, const char *ports, unsigned 
 		return fail(g, EINVAL, err, errlen, "No targets given");
 	}
 
+#ifndef CLCG_NO_IPV6
 	if (sp[1].n > ((u128)1 << 127) - sp[0].n) {
 		spans_free(sp);
 		return fail(g, EINVAL, err, errlen, "%s is too large (over 2^127 addresses)", cfg->cidr);
 	}
+#endif
 
 	g->n4     = sp[0].n;
 	g->valid  = sp[0].n + sp[1].n;
@@ -942,7 +961,13 @@ clcg *clcg_new_ports(const struct clcg_config *cfg, const char *ports, unsigned 
 	g->mask  = ((u128)1 << k) - 1;
 	g->shift = (k + 1) / 2;
 
+#ifdef CLCG_NO_IPV6
+	/* k is at most 33 here, so the high half never reaches the mask */
+	(void)c_hi;
+	u128 c    = (c_lo | 1) & g->mask;
+#else
 	u128 c    = (((u128)c_hi << 64) | c_lo | 1) & g->mask;
+#endif
 	u128 m    = (u128)1 << k;
 	u128 idx0 = shard - 1;
 
@@ -961,8 +986,10 @@ clcg *clcg_new_ports(const struct clcg_config *cfg, const char *ports, unsigned 
 	if (g->nports) {
 		unsigned kd = 0;
 
+#ifndef CLCG_NO_IPV6
 		if (g->valid > ((u128)1 << 127) / g->nports)
 			return fail(g, EINVAL, err, errlen, "%s with %zu ports is too large (over 2^127 IP:port pairs)", cfg->cidr, g->nports);
+#endif
 
 		g->targets = g->valid * g->nports;
 

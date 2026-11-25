@@ -205,6 +205,12 @@ sudo examples/ping 1.0.0.0/24 500   # 500 packets per second
 
 `ping` sends real packets, so only point it at networks you are allowed to probe. It needs root, or `sudo setcap cap_net_raw+ep examples/ping` once. The tests only run it against loopback.
 
+### IPv4-only builds
+
+On targets without `__int128` *(32-bit CPUs such as the ESP32)*, or when built with `-DCLCG_NO_IPV6`, the library is IPv4 only: `clcg_u128` becomes 64 bits and IPv6 targets are refused. For the same seed the IPv4 output is identical to a normal build.
+
+`libclcg.c` and `clcg.h` compile as-is for the ESP32 *(Xtensa and RISC-V, ESP-IDF or Arduino-ESP32)*. Add both files to your project; the command and the Makefile are Linux only.
+
 ## Performance
 
 Measured on a Ryzen 5 PRO 2400GE, one core, `-O2`:

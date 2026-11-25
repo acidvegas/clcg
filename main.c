@@ -24,7 +24,7 @@ typedef clcg_u128 u128;
 
 #define STATE_MARKER "clcg"
 
-#define VERSION "1.0.0"
+#define VERSION "1.1.0"
 
 static volatile sig_atomic_t stop_flag;
 
